@@ -1,0 +1,17 @@
+{
+  "name": "instagram-bot",
+  "version": "1.0.0",
+  "description": "Instagram automation backend using Meta Instagram Graph API",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.4.0",
+    "dotenv": "^16.3.1",
+    "express": "^5.2.1"
+  }
+}

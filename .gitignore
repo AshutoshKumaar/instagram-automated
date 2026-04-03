@@ -1,0 +1,6 @@
+node_modules/
+instagram-bot/node_modules/
+instagram-bot/.env
+.codex-test/
+.vercel/
+*.log
