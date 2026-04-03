@@ -20,6 +20,10 @@ app.use((req, res) => {
   res.status(404).send("Not Found");
 });
 
-app.listen(PORT, () => {
-  console.log(`Instagram webhook server running on port ${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Instagram webhook server running on port ${PORT}`);
+  });
+}
+
+export default app;
