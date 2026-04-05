@@ -22,7 +22,9 @@ export async function sendAutoReply(recipientId, text, accessTokenFromCaller) {
   };
 
   if (dryRun) {
-    console.log("[DRY_RUN] Would send message:", JSON.stringify({ endpoint: messagesEndpoint, payload }));
+    console.log(
+      JSON.stringify({ tag: "SEND_DRY_RUN", endpoint: messagesEndpoint, payload })
+    );
     return { ok: true, dry_run: true };
   }
 
@@ -36,14 +38,21 @@ export async function sendAutoReply(recipientId, text, accessTokenFromCaller) {
 
   while (attempt < maxAttempts) {
     try {
-      console.log(`[SEND] Attempting reply to ${recipientId} via ${messagesEndpoint}`);
+      console.log(
+        JSON.stringify({
+          tag: "SEND_ATTEMPT",
+          recipientId,
+          endpoint: messagesEndpoint,
+          attempt: attempt + 1
+        })
+      );
       const res = await axios.post(messagesEndpoint, payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json"
         }
       });
-      console.log(`[SEND] Success for ${recipientId}:`, JSON.stringify(res.data));
+      console.log(JSON.stringify({ tag: "SEND_SUCCESS", recipientId, data: res.data }));
       return res.data;
     } catch (err) {
       lastError = err;

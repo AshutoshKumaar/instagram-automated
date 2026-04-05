@@ -91,28 +91,42 @@ router.get("/", (req, res) => {
   res.sendStatus(403);
 });
 
-router.post("/", express.json(), async (req, res) => {
+router.post("/", express.json({ type: "*/*" }), async (req, res) => {
   try {
     const body = req.body;
-    console.log("[WEBHOOK] Incoming payload:", JSON.stringify(body, null, 2));
     console.log(
-      "[WEBHOOK] Top-level summary:",
       JSON.stringify({
-        object: body?.object,
+        tag: "WEBHOOK_HEADERS",
+        method: req.method,
+        contentType: req.headers["content-type"] || null,
+        userAgent: req.headers["user-agent"] || null
+      })
+    );
+    console.log(
+      JSON.stringify({
+        tag: "WEBHOOK_PAYLOAD",
+        body: body ?? null
+      })
+    );
+    console.log(
+      JSON.stringify({
+        tag: "WEBHOOK_SUMMARY",
+        object: body?.object ?? null,
         entryCount: Array.isArray(body?.entry) ? body.entry.length : 0,
         topLevelKeys: body ? Object.keys(body) : []
       })
     );
 
     const events = extractMessageEvents(body);
-    console.log(`[WEBHOOK] Actionable message events found: ${events.length}`);
+    console.log(JSON.stringify({ tag: "WEBHOOK_EVENT_COUNT", count: events.length }));
 
     if (events.length === 0) {
       if (Array.isArray(body?.entry)) {
         for (const [entryIndex, entry] of body.entry.entries()) {
           console.log(
-            `[WEBHOOK] Entry ${entryIndex} summary:`,
             JSON.stringify({
+              tag: "WEBHOOK_ENTRY_SUMMARY",
+              entryIndex,
               keys: Object.keys(entry || {}),
               changeFields: Array.isArray(entry?.changes)
                 ? entry.changes.map((change) => change?.field || "unknown")
@@ -126,8 +140,9 @@ router.post("/", express.json(), async (req, res) => {
 
     for (const [index, event] of events.entries()) {
       console.log(
-        `[WEBHOOK] Event ${index + 1}:`,
         JSON.stringify({
+          tag: "WEBHOOK_EVENT",
+          eventIndex: index + 1,
           source: event.source,
           senderId: event.senderId,
           text: event.text,
@@ -136,18 +151,17 @@ router.post("/", express.json(), async (req, res) => {
       );
 
       if (IG_ACCOUNT_ID && event.senderId === IG_ACCOUNT_ID) {
-        console.log(`[WEBHOOK] Skipping self-sent event from account ${event.senderId}`);
+        console.log(JSON.stringify({ tag: "WEBHOOK_SKIP_SELF", senderId: event.senderId }));
         continue;
       }
 
       if (!event.text) {
-        console.log(`[WEBHOOK] Event from ${event.senderId} has no text body, replying anyway.`);
+        console.log(JSON.stringify({ tag: "WEBHOOK_NO_TEXT", senderId: event.senderId }));
       }
 
-      console.log(`[WEBHOOK] Sending auto-reply to ${event.senderId}`);
+      console.log(JSON.stringify({ tag: "WEBHOOK_REPLY_ATTEMPT", senderId: event.senderId }));
       const replyResult = await sendAutoReply(event.senderId, REPLY_TEXT, ACCESS_TOKEN);
       console.log(
-        `[WEBHOOK] Auto-reply result for ${event.senderId}:`,
         JSON.stringify(replyResult)
       );
     }
