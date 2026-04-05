@@ -9,6 +9,22 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: "instagram-bot",
+    routes: ["/health", "/webhook", "/auth/callback"],
+  });
+});
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: "instagram-bot",
+    env: process.env.VERCEL ? "vercel" : "local",
+  });
+});
+
 app.get("/auth/callback", (req, res) => {
   console.log("Instagram business login callback:", JSON.stringify(req.query, null, 2));
   res.status(200).send("Instagram auth callback received. You can close this page.");
