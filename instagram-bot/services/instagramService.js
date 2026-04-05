@@ -36,12 +36,14 @@ export async function sendAutoReply(recipientId, text, accessTokenFromCaller) {
 
   while (attempt < maxAttempts) {
     try {
+      console.log(`[SEND] Attempting reply to ${recipientId} via ${messagesEndpoint}`);
       const res = await axios.post(messagesEndpoint, payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json"
         }
       });
+      console.log(`[SEND] Success for ${recipientId}:`, JSON.stringify(res.data));
       return res.data;
     } catch (err) {
       lastError = err;
