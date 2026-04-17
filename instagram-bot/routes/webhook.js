@@ -30,6 +30,75 @@ function buildEvent(source, senderId, text, raw) {
   };
 }
 
+function getMessagingEventType(messageEvent) {
+  if (!messageEvent || typeof messageEvent !== "object") return "unknown";
+  if (messageEvent.message) return "message";
+  if (messageEvent.read) return "read";
+  if (messageEvent.delivery) return "delivery";
+  if (messageEvent.postback) return "postback";
+  if (messageEvent.reaction || messageEvent.message_reaction) return "reaction";
+  if (messageEvent.optin) return "optin";
+  if (messageEvent.referral) return "referral";
+  if (messageEvent.standby) return "standby";
+  return "unknown";
+}
+
+function extractIgnoredEvents(body) {
+  const ignored = [];
+
+  if (!body || !Array.isArray(body.entry)) {
+    return ignored;
+  }
+
+  for (const [entryIndex, entry] of body.entry.entries()) {
+    if (Array.isArray(entry.messaging)) {
+      for (const [eventIndex, messageEvent] of entry.messaging.entries()) {
+        const senderId =
+          messageEvent?.sender?.id ||
+          messageEvent?.from?.id ||
+          messageEvent?.message?.from?.id ||
+          null;
+        const eventType = getMessagingEventType(messageEvent);
+
+        if (eventType !== "message" || !senderId) {
+          ignored.push({
+            source: "entry.messaging",
+            entryIndex,
+            eventIndex,
+            eventType,
+            senderId,
+            keys: messageEvent ? Object.keys(messageEvent) : [],
+            reason: eventType === "message"
+              ? "message_event_missing_sender"
+              : "non_message_event"
+          });
+        }
+      }
+    }
+
+    if (Array.isArray(entry.changes)) {
+      for (const [changeIndex, change] of entry.changes.entries()) {
+        const value = change?.value || {};
+        const hasMessages = Array.isArray(value.messages) && value.messages.length > 0;
+        const hasMessage = value.message && typeof value.message === "object";
+
+        if (!hasMessages && !hasMessage) {
+          ignored.push({
+            source: `entry.changes.${change?.field || "unknown"}`,
+            entryIndex,
+            changeIndex,
+            eventType: change?.field || "unknown",
+            keys: value ? Object.keys(value) : [],
+            reason: "change_without_message_payload"
+          });
+        }
+      }
+    }
+  }
+
+  return ignored;
+}
+
 function extractMessageEvents(body) {
   const events = [];
 
@@ -120,7 +189,22 @@ router.post("/", express.json({ type: "*/*" }), async (req, res) => {
     const events = extractMessageEvents(body);
     console.log(JSON.stringify({ tag: "WEBHOOK_EVENT_COUNT", count: events.length }));
 
+    const ignoredEvents = extractIgnoredEvents(body);
+    console.log(JSON.stringify({ tag: "WEBHOOK_IGNORED_EVENT_COUNT", count: ignoredEvents.length }));
+    for (const ignoredEvent of ignoredEvents) {
+      console.log(JSON.stringify({ tag: "WEBHOOK_IGNORED_EVENT", ...ignoredEvent }));
+    }
+
     if (events.length === 0) {
+      console.log(
+        JSON.stringify({
+          tag: "WEBHOOK_NO_ACTIONABLE_MESSAGE",
+          reason: ignoredEvents.length > 0
+            ? "received_only_non_message_or_incomplete_events"
+            : "no_supported_message_payload_found"
+        })
+      );
+
       if (Array.isArray(body?.entry)) {
         for (const [entryIndex, entry] of body.entry.entries()) {
           console.log(
