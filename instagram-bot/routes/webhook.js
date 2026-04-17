@@ -244,10 +244,18 @@ router.post("/", express.json({ type: "*/*" }), async (req, res) => {
       }
 
       console.log(JSON.stringify({ tag: "WEBHOOK_REPLY_ATTEMPT", senderId: event.senderId }));
-      const replyResult = await sendAutoReply(event.senderId, REPLY_TEXT, ACCESS_TOKEN);
-      console.log(
-        JSON.stringify(replyResult)
-      );
+      try {
+        const replyResult = await sendAutoReply(event.senderId, REPLY_TEXT, ACCESS_TOKEN);
+        console.log(JSON.stringify({ tag: "WEBHOOK_REPLY_RESULT", result: replyResult }));
+      } catch (err) {
+        console.error(
+          JSON.stringify({
+            tag: "WEBHOOK_REPLY_FAILED",
+            senderId: event.senderId,
+            error: err?.response?.data || { message: err?.message || String(err) }
+          })
+        );
+      }
     }
 
     res.sendStatus(200);

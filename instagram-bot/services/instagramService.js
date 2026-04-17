@@ -1,10 +1,19 @@
 import axios from "axios";
 
-const API_VERSION = process.env.INSTAGRAM_API_VERSION || "v21.0";
+const API_VERSION = process.env.INSTAGRAM_API_VERSION || "v25.0";
 const GRAPH_BASE = "https://graph.instagram.com";
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getErrorPayload(err) {
+  return err && err.response ? err.response.data : { message: err?.message || String(err) };
+}
+
+function isPermanentApiError(err) {
+  const status = err?.response?.status;
+  return status >= 400 && status < 500;
 }
 
 export async function sendAutoReply(recipientId, text, accessTokenFromCaller) {
@@ -57,13 +66,28 @@ export async function sendAutoReply(recipientId, text, accessTokenFromCaller) {
     } catch (err) {
       lastError = err;
       attempt += 1;
+
+      if (isPermanentApiError(err)) {
+        const errorPayload = getErrorPayload(err);
+        console.warn(
+          JSON.stringify({
+            tag: "SEND_PERMANENT_FAILURE",
+            recipientId,
+            attempt,
+            status: err.response.status,
+            error: errorPayload
+          })
+        );
+        throw err;
+      }
+
       const backoff = 500 * Math.pow(2, attempt - 1);
       console.warn(`sendAutoReply attempt ${attempt} failed, retrying in ${backoff}ms`);
       await wait(backoff);
     }
   }
 
-  const errorPayload = lastError && lastError.response ? lastError.response.data : lastError;
+  const errorPayload = getErrorPayload(lastError);
   console.error("sendAutoReply failed after retries:", errorPayload);
   throw lastError;
 }
